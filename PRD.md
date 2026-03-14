@@ -73,7 +73,7 @@ Alex deploys and operates Heron itself. Alex configures connector credentials, m
 | **Fact** | A single assertion: [entity-id, attribute, value, transaction-id]. Facts accumulate; they are not overwritten. |
 | **Connector** | A component that fetches state from a provider and transacts it into Datomic. |
 | **Connector Run** | A single execution of a connector producing a complete (or incremental) snapshot of a provider's state. |
-| **Sync** | The process of a connector run writing new facts into Datomic and retracting facts for resources that no longer exist. |
+| **Sync** | The process of a connector run writing new facts into Datomic and issuing native retractions for resources that no longer exist. |
 | **Datalog Query** | A declarative logic query executed against the Datomic database. The primary query interface. |
 | **Check** | A named boolean compliance goal: a Datalog query that returns violations. If the query returns zero results, the check passes. |
 | **Check Violation** | A specific entity that causes a Check to fail, recorded with a timestamp. |
@@ -98,7 +98,7 @@ Alex deploys and operates Heron itself. Alex configures connector credentials, m
 | FR-CON-02 | A connector run MUST produce a sequence of entity maps conforming to the Heron entity map format. |
 | FR-CON-03 | Each entity map MUST include a `:heron/id` — a stable, globally unique string identifier for the resource. |
 | FR-CON-04 | The sync process MUST be idempotent: running the same connector twice without underlying changes MUST NOT produce new transactions. |
-| FR-CON-05 | Resources absent from a connector run that were present in the previous run MUST be soft-deleted via `:heron/retracted-at`. |
+| FR-CON-05 | Resources absent from a connector run that were present in the previous run MUST be retracted using `[:db/retractEntity eid]` (or targeted `:db/retract` datoms). |
 | FR-CON-06 | Connector run metadata (start time, end time, status, entity count, errors) MUST be recorded as Datomic entities. |
 | FR-CON-07 | Heron MUST include a connector for AWS covering: S3, EC2, IAM (roles, policies, users), RDS, Lambda, Route53, ACM. |
 | FR-CON-08 | Heron MUST include a connector for GitHub covering: organizations, repositories, teams, team memberships. |
@@ -250,7 +250,7 @@ Alex deploys and operates Heron itself. Alex configures connector credentials, m
    a. Loads previous connector run's entity-id set from Datomic
    b. Diffs current entity maps against prior state
    c. Transacts new/changed entities as upserts (using :heron/id as identity)
-   d. For entities absent in current run: transacts {:heron/retracted-at <now>}
+   d. For entities absent in current run: transacts [:db/retractEntity eid]
    e. Records ConnectorRun entity with metadata
 5. Check Engine evaluates all enabled Checks against new db value
 6. Report Engine evaluates all enabled Reports, diffs against last run
@@ -338,21 +338,15 @@ Examples:
 
 Datomic schema: `:heron/id` is a `:db.type/string` attribute with `:db.unique/identity` ensuring upsert semantics.
 
-### Soft Delete: `:heron/retracted-at`
+### Deletion: Native Datomic Retractions
 
-Heron does not use Datomic retractions for resource deletion. Instead, a `:heron/retracted-at` timestamp is asserted when a resource is absent from a connector run. This preserves full history and allows queries to filter active vs. deleted resources.
+When a resource is absent from a connector run, Heron retracts its entity using `[:db/retractEntity eid]` (or targeted `:db/retract` datoms for individual attributes). Datomic records each retraction as an immutable datom in the transaction log — no history is lost. An `as-of` query scoped to any point before the retraction will return the entity exactly as it existed at that time.
 
-Schema:
+Queries naturally return only live (non-retracted) entities; no filter clause is required. To inspect historical state, scope the query with `datomic.api/as-of`:
+
 ```clojure
-{:db/ident       :heron/retracted-at
- :db/valueType   :db.type/instant
- :db/cardinality :db.cardinality/one
- :db/doc         "Wall-clock time at which this entity was no longer observed by its connector."}
-```
-
-Queries for active resources should include:
-```clojure
-(not [?e :heron/retracted-at])
+;; State of the database 30 days ago — retracted entities reappear
+(d/as-of db (java.util.Date. (- (System/currentTimeMillis) (* 30 86400000))))
 ```
 
 ### Connector Run Metadata Schema
@@ -439,8 +433,7 @@ Find all S3 buckets where public access blocking is not enabled:
  :where
  [?e :aws.s3.bucket/name ?name]
  [?e :aws.s3.bucket/region ?region]
- [?e :aws.s3.bucket/public-access-blocked false]
- (not [?e :heron/retracted-at])]
+ [?e :aws.s3.bucket/public-access-blocked false]]
 ```
 
 ### Example: Cross-Provider Query
@@ -452,9 +445,7 @@ Find GitHub repositories whose name matches an AWS Lambda function name (useful 
  :where
  [?r :github.repo/name ?repo-name]
  [?f :aws.lambda/name ?fn-name]
- [(= ?repo-name ?fn-name)]
- (not [?r :heron/retracted-at])
- (not [?f :heron/retracted-at])]
+ [(= ?repo-name ?fn-name)]]
 ```
 
 ### Example: As-of Query
@@ -549,10 +540,10 @@ Returns all registered Datomic attributes grouped by namespace:
 
 For Check and Report authors:
 
-1. **Always filter soft-deleted entities:** Include `(not [?e :heron/retracted-at])` in every query unless you explicitly want to see deleted resources.
+1. **Queries naturally return live entities:** Because absent resources are natively retracted, no filter clause is needed. To query historical state, use `datomic.api/as-of`.
 2. **Use pull syntax for Reports:** `(pull ?e [:aws.s3.bucket/name :aws.s3.bucket/region])` returns maps instead of tuples, making results self-documenting.
 3. **Check queries must return entity-ids:** The first `?find` variable in a Check query must be the entity-id `?e` — this is how Heron tracks which specific resources are violating.
-4. **Use Datomic rules for reusable predicates:** Common filters (e.g., "is active", "is production-tagged") can be expressed as named Datalog rules and reused across queries.
+4. **Use Datomic rules for reusable predicates:** Common filters (e.g., "is production-tagged") can be expressed as named Datalog rules and reused across queries.
 5. **Parameterize where possible:** Queries can accept arguments (`?account-id`, `?environment`) to make checks reusable across environments.
 
 ---
@@ -567,8 +558,7 @@ For Check and Report authors:
  :check/name        "S3 Buckets Block Public Access"
  :check/description "All S3 buckets must have the public access block fully enabled."
  :check/query       "[:find ?e :where
-                       [?e :aws.s3.bucket/public-access-blocked false]
-                       (not [?e :heron/retracted-at])]"
+                       [?e :aws.s3.bucket/public-access-blocked false]]"
 
  ;; Optional
  :check/severity    :high                           ;; post-MVP
@@ -620,8 +610,7 @@ For Check and Report authors:
                                        :aws.ec2.instance/region])
                         :where
                         [?e :aws.ec2.instance/id _]
-                        (not [?e :aws.ec2.instance/tag-cost-center _])
-                        (not [?e :heron/retracted-at])]"
+                        (not [?e :aws.ec2.instance/tag-cost-center _])]"
  :report/enabled     true}
 ```
 
@@ -657,7 +646,7 @@ Strong Checks use `datomic.api/with` to apply a hypothetical set of transactions
      * Map Terraform resource type → Heron entity map format
      * Assign :heron/id using Terraform address as seed
    - For each resource being destroyed:
-     * Emit {:heron/id "..." :heron/retracted-at <now>}
+     * Emit [:db/retractEntity eid] (looked up by :heron/id)
 3. Transact entity maps into speculative db using datomic.api/with
 4. Evaluate requested Checks against speculative db value
 5. Return per-check results
@@ -753,11 +742,11 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 
 **Goal:** Prove the core data model works. Queryable data in Datomic.
 
-- [ ] Datomic schema: `heron/id`, `heron/retracted-at`, `heron/provider`, `heron/label`, `heron/label`
+- [ ] Datomic schema: `heron/id`, `heron/provider`, `heron/label`
 - [ ] `IConnector` protocol defined
 - [ ] AWS S3 connector (buckets only)
 - [ ] AWS IAM connector (roles only)
-- [ ] Sync engine: upsert + soft-delete
+- [ ] Sync engine: upsert + retract
 - [ ] ConnectorRun metadata
 - [ ] REPL-based Datalog queries working
 - [ ] `docker-compose.yml` for Datomic transactor + PostgreSQL
@@ -834,13 +823,13 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 
 ---
 
-### ADR-2: Soft Delete via `:heron/retracted-at`
+### ADR-2: Native Datomic Retractions for Absent Resources
 
-**Decision:** When a resource is absent from a connector run, assert `:heron/retracted-at` on its entity rather than using Datomic's native retractions.
+**Decision:** When a resource is absent from a connector run, retract its entity using `[:db/retractEntity eid]` (or targeted `:db/retract` datoms for individual attributes) rather than asserting a soft-delete timestamp.
 
-**Rationale:** Datomic retractions remove facts from the current database value, making them invisible to non-historical queries. We want soft-deleted resources to be invisible by default to current queries but visible in as-of queries. Asserting a timestamp attribute achieves this: active-resource queries add `(not [?e :heron/retracted-at])`, and historical queries can use `as-of` to see state before the retraction timestamp.
+**Rationale:** Datomic retractions are themselves immutable datoms recorded in the transaction log. An `as-of` query scoped to any point before the retraction will return the entity exactly as it existed — full audit history is preserved. The earlier soft-delete approach (`:heron/retracted-at`) was based on a misconception that retractions destroy history; they do not. Native retractions are strictly simpler: no extra schema attribute, no boilerplate filter clause in every query, and no risk of authors forgetting the filter.
 
-**Consequences:** All queries must explicitly filter `:heron/retracted-at` to see only active resources. This is a convention that must be documented and enforced in check/report authoring guidelines.
+**Consequences:** Queries naturally return only live entities — no filter required. Historical state is accessed via `datomic.api/as-of`. The `:heron/retracted-at` attribute is not part of the schema.
 
 ---
 

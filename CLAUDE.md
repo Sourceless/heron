@@ -34,7 +34,7 @@ docker compose up            # Start Datomic transactor + PostgreSQL
 
 ```
 Scheduler (chime) → Connector.run() → entity maps
-  → Sync Engine (upsert + soft-delete via :heron/retracted-at)
+  → Sync Engine (upsert + retract absent entities)
   → Datomic transact
   → Check Engine (Datalog compliance queries)
   → Report Engine (list queries with change detection)
@@ -61,7 +61,7 @@ Scheduler (chime) → Connector.run() → entity maps
 ### Key Architectural Decisions
 
 - **ADR-1**: Datomic as sole datastore — full time-travel via as-of queries is a first-class feature
-- **ADR-2**: Soft delete via `:heron/retracted-at` — never use Datomic retractions; preserves audit history
+- **ADR-2**: Native Datomic retractions — use `[:db/retractEntity eid]` or targeted `:db/retract` datoms for absent resources; Datomic records retractions in the immutable log, so `as-of` queries before the retraction still show the entity
 - **ADR-3**: Stable `:heron/id` for idempotency — upsert semantics; running same connector twice must not create new transactions
 - **ADR-4**: Polling as MVP sync model — full fetches per run for consistency; events are post-MVP
 - **ADR-5**: `datomic.api/with` for Strong Checks — speculative DB evaluation of Terraform plans without committing
@@ -72,7 +72,7 @@ Scheduler (chime) → Connector.run() → entity maps
 src/heron/
   schema.clj        # Datomic attribute definitions
   connector.clj     # IConnector protocol
-  sync.clj          # Sync engine (upsert + soft-delete)
+  sync.clj          # Sync engine (upsert + retract)
   check.clj         # Check evaluation engine
   report.clj        # Report evaluation engine
   api.clj           # REST API (Ring + Reitit)

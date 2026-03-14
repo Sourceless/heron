@@ -424,7 +424,7 @@
       <div class="step">
         <div class="step-num">3</div>
         <div class="step-name">Sync Engine</div>
-        <div class="step-desc">Upserts new facts into Datomic; soft-deletes absent resources.</div>
+        <div class="step-desc">Upserts new facts into Datomic; retracts absent resources.</div>
       </div>
       <div class="arrow">→</div>
       <div class="step">
@@ -455,8 +455,7 @@
  :where
  [?e :aws.s3.bucket/name ?name]
  [?e :aws.s3.bucket/region ?region]
- [?e :aws.s3.bucket/public-access-blocked false]
- (not [?e :heron/retracted-at])]</pre>
+ [?e :aws.s3.bucket/public-access-blocked false]]</pre>
     </div>
     <p style="margin-top: 1rem; font-size: 0.9rem;">
       No scripts, no SDK calls, no bespoke parsers — just a declarative query
