@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: datomic
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datomic}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  datomic:
+    build:
+      context: .
+      dockerfile: docker/datomic/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATOMIC_SQL_USER: ${DATOMIC_SQL_USER}
+      DATOMIC_SQL_PASSWORD: ${DATOMIC_SQL_PASSWORD}
+    volumes:
+      - ./docker/datomic/transactor.properties:/opt/datomic/config/transactor.properties
+    ports:
+      - "4334:4334"
+      - "4335:4335"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z $(hostname -i) 4334 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: s3,iam,ec2,lambda,route53,acm
+      DEFAULT_REGION: us-east-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres_data:
+  localstack_data:

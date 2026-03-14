@@ -18,6 +18,17 @@ Heron is a unified, immutable infrastructure database built in Clojure. It conti
 - **Cognitect aws-api** — data-oriented AWS SDK
 - **tools.build / deps.edn** — build system
 
+## Dev Environment
+
+Toolchain is pinned via Nix. `flake.nix` provides `clojure`, `jdk21`, and `clj-kondo`.
+
+```bash
+nix develop          # Enter dev shell (one-off)
+direnv allow         # Auto-activate shell on cd (requires direnv + nix-direnv)
+```
+
+`.envrc` runs `use flake` and loads `.env` (DB credentials etc.) automatically when direnv is active.
+
 ## Build & Dev Commands
 
 *(To be added as implementation begins. Expected commands:)*
