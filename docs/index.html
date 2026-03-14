@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heron — Immutable Infrastructure Database</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f1117;
+      --card:    #1a1d27;
+      --accent:  #6ee7b7;
+      --text:    #e2e8f0;
+      --muted:   #94a3b8;
+      --border:  #2d3148;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      padding: 0 1.5rem;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* ── Hero ────────────────────────────────────────────── */
+    .hero {
+      padding: 5rem 0 4rem;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: clamp(3rem, 8vw, 5rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero p {
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      color: var(--muted);
+      max-width: 640px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.75rem 1.75rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0f1117;
+    }
+
+    .btn-secondary {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Section titles ───────────────────────────────────── */
+    section {
+      padding: 4rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: var(--text);
+    }
+
+    h2 span {
+      color: var(--accent);
+    }
+
+    p { color: var(--muted); }
+
+    /* ── Problem cards ────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.75rem;
+    }
+
+    .card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    /* ── Solution ─────────────────────────────────────────── */
+    .solution-body {
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 720px;
+      line-height: 1.75;
+    }
+
+    /* ── Pipeline ─────────────────────────────────────────── */
+    .pipeline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      align-items: stretch;
+      margin-top: 1rem;
+    }
+
+    .step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 1.25rem 1.5rem;
+      flex: 1 1 140px;
+      position: relative;
+    }
+
+    .step:first-child { border-radius: 10px 0 0 10px; }
+    .step:last-child  { border-radius: 0 10px 10px 0; }
+
+    .step-num {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.35rem;
+    }
+
+    .step-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+
+    .step-desc {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .arrow {
+      align-self: center;
+      color: var(--accent);
+      font-size: 1.25rem;
+      padding: 0 0.25rem;
+      flex: 0 0 auto;
+    }
+
+    @media (max-width: 600px) {
+      .pipeline { flex-direction: column; }
+      .step { border-radius: 0 !important; }
+      .step:first-child { border-radius: 10px 10px 0 0 !important; }
+      .step:last-child  { border-radius: 0 0 10px 10px !important; }
+      .arrow { transform: rotate(90deg); align-self: flex-start; padding: 0.25rem 1.5rem; }
+    }
+
+    /* ── Code block ───────────────────────────────────────── */
+    .code-frame {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .code-label {
+      padding: 0.6rem 1.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 0.04em;
+    }
+
+    pre {
+      padding: 1.5rem 1.25rem;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.88rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+
+    .section-desc {
+      margin-bottom: 1.5rem;
+      max-width: 640px;
+    }
+
+    /* ── Roadmap ──────────────────────────────────────────── */
+    .roadmap {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .phase {
+      display: flex;
+      gap: 1.5rem;
+      position: relative;
+    }
+
+    .phase-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 0 0 auto;
+    }
+
+    .phase-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--border);
+      border: 2px solid var(--border);
+      margin-top: 0.35rem;
+      flex: 0 0 auto;
+    }
+
+    .phase-dot.active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .phase-connector {
+      width: 2px;
+      flex: 1;
+      background: var(--border);
+      min-height: 1.5rem;
+    }
+
+    .phase:last-child .phase-connector { display: none; }
+
+    .phase-body {
+      padding-bottom: 2rem;
+      flex: 1;
+    }
+
+    .phase-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .phase-name {
+      font-weight: 700;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .phase-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .badge-active {
+      background: rgba(110, 231, 183, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(110, 231, 183, 0.3);
+    }
+
+    .badge-planned {
+      background: var(--card);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .phase-goal {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    footer .built-with {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hero -->
+  <header class="hero">
+    <h1>Heron</h1>
+    <p>
+      A unified, immutable infrastructure database. It continuously ingests the
+      state of your infrastructure from cloud providers and developer platforms,
+      stores every fact with a timestamp, and makes the entire corpus queryable
+      with Datalog.
+    </p>
+    <div class="cta-group">
+      <a class="btn btn-primary" href="https://github.com/Sourceless/heron">View on GitHub</a>
+      <a class="btn btn-secondary" href="https://github.com/Sourceless/heron/blob/main/PRD.md">Read the PRD</a>
+    </div>
+  </header>
+
+  <!-- The Problem -->
+  <section>
+    <h2>The <span>Problem</span></h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>The Visibility Gap</h3>
+        <p>
+          There is no single place to ask "what is my infrastructure right now?"
+          AWS Console shows EC2. GitHub shows repositories. A platform engineer
+          investigating an incident must context-switch between five consoles,
+          three CLIs, and a pile of Terraform state files.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Compliance Drift</h3>
+        <p>
+          Compliance goals are written in documentation but enforced nowhere.
+          Violations accumulate silently between audits. By the time a security
+          engineer runs a manual check, dozens of resources may be
+          non-compliant — with no record of when they drifted or who changed them.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Shift-Left Failure</h3>
+        <p>
+          Even teams that have adopted Infrastructure-as-Code struggle to enforce
+          policy at plan time. Terraform plan output is text, not data. Pre-flight
+          checks require bespoke parsing of HCL or JSON, are brittle, and cannot
+          reason about the effect of a change on existing state.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- The Solution -->
+  <section>
+    <h2>The <span>Solution</span></h2>
+    <p class="solution-body">
+      Heron is an immutable infrastructure database built on
+      <strong style="color: var(--text)">Datomic</strong>. Every fact about every
+      resource is stored with a timestamp and never overwritten — history is a
+      first-class feature, not an afterthought. Compliance goals are expressed as
+      <strong style="color: var(--text)">Datalog queries</strong>, not scripts:
+      a check passes when its query returns zero results. Pre-flight enforcement
+      is possible because Heron can project a Terraform plan onto existing state
+      and evaluate compliance before anything is applied.
+    </p>
+  </section>
+
+  <!-- How It Works -->
+  <section>
+    <h2>How It <span>Works</span></h2>
+    <div class="pipeline">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-name">Scheduler</div>
+        <div class="step-desc">Chime triggers connector runs on a configurable cadence.</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-name">Connector</div>
+        <div class="step-desc">Fetches all resources from AWS or GitHub; emits entity maps.</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-name">Sync Engine</div>
+        <div class="step-desc">Upserts new facts into Datomic; soft-deletes absent resources.</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-name">Check Engine</div>
+        <div class="step-desc">Runs compliance Datalog queries; records violations and transitions.</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-name">Report Engine</div>
+        <div class="step-desc">Evaluates list queries; tracks additions and removals over time.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Compliance as a Query -->
+  <section>
+    <h2>Compliance as a <span>Query</span></h2>
+    <p class="section-desc">
+      Checks are just Datalog queries. If the query returns zero results, the
+      check passes. Here is the built-in check that enforces S3 public-access
+      blocking across every bucket in your account:
+    </p>
+    <div class="code-frame">
+      <div class="code-label">Datalog — :s3/public-access-blocked</div>
+      <pre>[:find ?name ?region
+ :where
+ [?e :aws.s3.bucket/name ?name]
+ [?e :aws.s3.bucket/region ?region]
+ [?e :aws.s3.bucket/public-access-blocked false]
+ (not [?e :heron/retracted-at])]</pre>
+    </div>
+    <p style="margin-top: 1rem; font-size: 0.9rem;">
+      No scripts, no SDK calls, no bespoke parsers — just a declarative query
+      evaluated against the full historical corpus of your infrastructure.
+    </p>
+  </section>
+
+  <!-- Roadmap -->
+  <section>
+    <h2><span>Roadmap</span></h2>
+    <p class="section-desc">
+      No time estimates — this is a solo project sequenced by dependency and risk.
+    </p>
+    <div class="roadmap">
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot active"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-header">
+            <span class="phase-name">Phase 0 — Foundation</span>
+            <span class="phase-badge badge-active">In progress</span>
+          </div>
+          <p class="phase-goal">Prove the core data model. Datomic schema, IConnector protocol, S3 and IAM connectors, sync engine, REPL-based Datalog queries.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-header">
+            <span class="phase-name">Phase 1 — MVP Core</span>
+            <span class="phase-badge badge-planned">Planned</span>
+          </div>
+          <p class="phase-goal">All MVP features working: full AWS + GitHub connectors, check and report engines, HTTP API, CLI, Chime scheduler.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-header">
+            <span class="phase-name">Phase 2 — Operationalization</span>
+            <span class="phase-badge badge-planned">Planned</span>
+          </div>
+          <p class="phase-goal">Reliable for daily use: multi-account AWS, health API, schema discovery, custom check loading, beta release.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-header">
+            <span class="phase-name">Phase 3 — Real-Time Connectors</span>
+            <span class="phase-badge badge-planned">Planned</span>
+          </div>
+          <p class="phase-goal">Reduce data latency to &lt;60 seconds via EventBridge and GitHub webhooks; polling as fallback.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-header">
+            <span class="phase-name">Phase 4 — Strong Checks</span>
+            <span class="phase-badge badge-planned">Planned</span>
+          </div>
+          <p class="phase-goal">Pre-flight compliance enforcement in CI/CD: Terraform plan projection via datomic.api/with, GitHub Action integration.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-line">
+          <div class="phase-dot"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-body">
+          <div class="phase-header">
+            <span class="phase-name">Phase 5 — Platform Expansion</span>
+            <span class="phase-badge badge-planned">Planned</span>
+          </div>
+          <p class="phase-goal">Connector SDK, GCP and Azure connectors, browser UI, multi-tenancy, RBAC.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <a href="https://github.com/Sourceless/heron">github.com/Sourceless/heron</a>
+    <span class="built-with">Built with Clojure and Datomic</span>
+  </footer>
+
+</div>
+</body>
+</html>
