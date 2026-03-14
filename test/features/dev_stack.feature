@@ -14,4 +14,4 @@ Feature: Dev stack services are healthy
   Scenario: LocalStack is healthy and S3 is running
     When I call the LocalStack health endpoint
     Then the response status is 200
-    And the "s3" service status is "available"
+    And the "s3" service status is "running"

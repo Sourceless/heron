@@ -42,8 +42,11 @@ services:
     environment:
       SERVICES: s3,iam,ec2,lambda,route53,acm
       DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
     volumes:
       - localstack_data:/var/lib/localstack
+      - ./docker/localstack/seed.sh:/etc/localstack/init/ready.d/seed.sh
     ports:
       - "4566:4566"
     healthcheck:

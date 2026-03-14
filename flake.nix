@@ -17,6 +17,7 @@
             pkgs.clojure
             pkgs.jdk21
             pkgs.clj-kondo
+            pkgs.awscli2
           ];
 
           shellHook = ''
