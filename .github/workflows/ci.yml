@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: clj-kondo/setup-clj-kondo@v1
+      - uses: DeLaGuardo/setup-clj-kondo@v1
       - run: clj-kondo --lint src
 
   security:
@@ -23,7 +23,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: DeLaGuardo/setup-clojure@12
+      - uses: DeLaGuardo/setup-clojure@13.5.3
         with:
           cli: latest
       - uses: actions/cache@v4
@@ -42,7 +42,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: DeLaGuardo/setup-clojure@12
+      - uses: DeLaGuardo/setup-clojure@13.5.3
         with:
           cli: latest
       - uses: actions/cache@v4
