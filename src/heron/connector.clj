@@ -36,6 +36,39 @@
     :db/cardinality :db.cardinality/one
     :db/doc         "Tag value (e.g. \"production\")."}])
 
+(def connector-run-schema
+  "Datomic attributes for ConnectorRun metadata entities."
+  [{:db/ident       :heron.connector-run/id
+    :db/valueType   :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db/unique      :db.unique/identity
+    :db/doc         "Unique run ID (random UUID string)."}
+
+   {:db/ident       :heron.connector-run/provider
+    :db/valueType   :db.type/keyword
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Provider keyword: :aws | :github"}
+
+   {:db/ident       :heron.connector-run/connector
+    :db/valueType   :db.type/string
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Connector name, e.g. \"s3\", \"iam-roles\", \"iam-users\"."}
+
+   {:db/ident       :heron.connector-run/started-at
+    :db/valueType   :db.type/instant
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Wall-clock time when connector/run was invoked."}
+
+   {:db/ident       :heron.connector-run/finished-at
+    :db/valueType   :db.type/instant
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Wall-clock time when sync/ingest! completed."}
+
+   {:db/ident       :heron.connector-run/resource-count
+    :db/valueType   :db.type/long
+    :db/cardinality :db.cardinality/one
+    :db/doc         "Number of resource entities returned by the connector in this run."}])
+
 (defprotocol IConnector
   "All connectors implement this single method.
    run returns a seq of entity maps, each containing:
