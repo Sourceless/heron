@@ -14,7 +14,7 @@
  :aliases
  {:dev  {:extra-paths ["dev"]}
 
-  :nvd  {:extra-deps {nvd-clojure/nvd-clojure {:mvn/version "4.2.0"}}
+  :nvd  {:extra-deps {nvd-clojure/nvd-clojure {:mvn/version "5.3.0"}}
          :main-opts  ["-m" "nvd.task.check" "--config-filename" "nvd-config.edn"]}
 
   :test {:extra-paths ["test"]
