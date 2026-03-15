@@ -1,4 +1,10 @@
 {:paths ["src"]
+
+ :deps {com.datomic/peer             {:mvn/version "1.0.7556"}
+        com.cognitect.aws/api       {:mvn/version "0.8.692"}
+        com.cognitect.aws/endpoints {:mvn/version "1.1.12.626"}
+        com.cognitect.aws/s3        {:mvn/version "848.2.1413.0"}}
+
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps  {lambdaisland/kaocha          {:mvn/version "1.91.1392"}

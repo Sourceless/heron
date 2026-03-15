@@ -22,6 +22,10 @@
 
           shellHook = ''
             echo "Heron dev shell ready (Clojure $(clojure --version 2>&1 | head -1), Java $(java -version 2>&1 | head -1))"
+            # Dummy credentials for LocalStack (real creds come from ~/.aws or env in production)
+            export AWS_ACCESS_KEY_ID=''${AWS_ACCESS_KEY_ID:-test}
+            export AWS_SECRET_ACCESS_KEY=''${AWS_SECRET_ACCESS_KEY:-test}
+            export AWS_DEFAULT_REGION=''${AWS_DEFAULT_REGION:-us-east-1}
           '';
         };
       });
