@@ -9,6 +9,9 @@
  :aliases
  {:dev  {:extra-paths ["dev"]}
 
+  :nvd  {:extra-deps {nvd-clojure/nvd-clojure {:mvn/version "4.2.0"}}
+         :main-opts  ["-m" "nvd.task.check" "--config-filename" "nvd-config.edn"]}
+
   :test {:extra-paths ["test"]
          :extra-deps  {lambdaisland/kaocha          {:mvn/version "1.91.1392"}
                        lambdaisland/kaocha-cucumber {:mvn/version "0.11.100"}
