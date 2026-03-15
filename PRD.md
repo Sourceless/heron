@@ -745,11 +745,11 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 - [x] Datomic schema: `heron/id`, `heron/provider`, `heron/label`
 - [x] `IConnector` protocol defined
 - [x] AWS S3 connector (buckets only)
-- [ ] AWS IAM connector (roles only)
+- [x] AWS IAM connector (roles only)
 - [x] Sync engine: upsert
 - [x] Sync engine: retract absent entities
-- [ ] ConnectorRun metadata
-- [ ] REPL-based Datalog queries working
+- [x] ConnectorRun metadata
+- [x] REPL-based Datalog queries working
 - [x] `docker-compose.yml` for Datomic transactor + PostgreSQL
 
 ### Phase 1: MVP Core
