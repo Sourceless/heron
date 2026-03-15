@@ -1,5 +1,5 @@
 (ns heron.steps.s3-connector-steps
-  (:require [lambdaisland.cucumber.dsl :refer [When Then]]
+  (:require [lambdaisland.cucumber.dsl :refer [Given When Then]]
             [heron.connector          :refer [run]]
             [heron.sync               :as sync]
             [heron.connectors.aws.s3  :as s3]
@@ -40,6 +40,34 @@
         results (d/q '[:find [?e ...] :in $ ?id :where [?e :heron/id ?id]] db heron-id)]
     (assert (= 1 (count results))
             (str "Expected 1 entity with :heron/id '" heron-id "', found: " (count results))))
+  state)
+
+(Given "a phantom bucket {string} is present in Datomic" [state bucket-name]
+  (let [conn (or (:datomic-conn state) (fresh-conn!))
+        phantom {:heron/id           (str "aws:000000000000:s3:bucket:" bucket-name)
+                 :heron/provider     :aws
+                 :heron/label        bucket-name
+                 :aws.s3.bucket/name bucket-name}]
+    @(d/transact conn [phantom])
+    (assoc state :datomic-conn conn)))
+
+(When "I retract absent S3 entities from Datomic" [state]
+  (let [conn        (:datomic-conn state)
+        current-ids (map :heron/id (:s3-entities state))
+        db-before   (d/db conn)]
+    (sync/retract-absent! conn :aws.s3.bucket/name current-ids)
+    (assoc state :db-before-retraction db-before)))
+
+(Then "the bucket {string} does not exist in the current Datomic db" [state bucket-name]
+  (let [db  (d/db (:datomic-conn state))
+        eid (d/q '[:find ?e . :in $ ?n :where [?e :aws.s3.bucket/name ?n]] db bucket-name)]
+    (assert (nil? eid) (str "Bucket '" bucket-name "' should have been retracted")))
+  state)
+
+(Then "the bucket {string} is visible in Datomic as-of before the retraction" [state bucket-name]
+  (let [db-before (:db-before-retraction state)
+        eid       (d/q '[:find ?e . :in $ ?n :where [?e :aws.s3.bucket/name ?n]] db-before bucket-name)]
+    (assert eid (str "Bucket '" bucket-name "' should be visible as-of before retraction")))
   state)
 
 (Then "the bucket {string} has provider :aws and label {string}" [state bucket-name label]

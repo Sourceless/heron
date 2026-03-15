@@ -747,7 +747,7 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 - [x] AWS S3 connector (buckets only)
 - [ ] AWS IAM connector (roles only)
 - [x] Sync engine: upsert
-- [ ] Sync engine: retract absent entities
+- [x] Sync engine: retract absent entities
 - [ ] ConnectorRun metadata
 - [ ] REPL-based Datalog queries working
 - [x] `docker-compose.yml` for Datomic transactor + PostgreSQL

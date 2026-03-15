@@ -1,5 +1,6 @@
 (ns heron.sync
-  (:require [datomic.api :as d]))
+  (:require [clojure.set :as set]
+            [datomic.api :as d]))
 
 (defn ensure-schema!
   "Transacts a schema attribute vector into conn. Safe to call repeatedly —
@@ -13,3 +14,26 @@
   [conn entities]
   (when (seq entities)
     @(d/transact conn (vec entities))))
+
+(defn retract-absent!
+  "Retract entities that carry scope-attr but whose :heron/id is absent from current-ids.
+   Use after ingest! to remove resources that disappeared from the provider.
+   scope-attr — a Datomic attribute present on every entity this connector manages
+                (e.g. :aws.s3.bucket/name); used to scope the retraction to this connector.
+   current-ids — set (or seq) of :heron/id strings from the current connector run."
+  [conn scope-attr current-ids]
+  (let [db       (d/db conn)
+        prev-ids (set (d/q '[:find [?id ...]
+                              :in $ ?a
+                              :where [?e ?a]
+                                     [?e :heron/id ?id]]
+                            db scope-attr))
+        absent   (set/difference prev-ids (set current-ids))]
+    (when (seq absent)
+      (let [eids        (keep #(d/q '[:find ?e . :in $ ?id
+                                      :where [?e :heron/id ?id]]
+                                    (d/db conn) %)
+                              absent)
+            retractions (mapv #(vector :db/retractEntity %) eids)]
+        (when (seq retractions)
+          @(d/transact conn retractions))))))
