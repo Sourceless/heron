@@ -94,8 +94,8 @@ Alex deploys and operates Heron itself. Alex configures connector credentials, m
 
 | ID | Requirement |
 |----|-------------|
-| FR-CON-01 | Heron MUST provide an `IConnector` protocol that any connector must implement. |
-| FR-CON-02 | A connector run MUST produce a sequence of entity maps conforming to the Heron entity map format. |
+| FR-CON-01 | Heron MUST provide an `IConnector` protocol with a single `run` method that any connector must implement. |
+| FR-CON-02 | A connector's `run` method MUST produce a sequence of entity maps conforming to the Heron entity map format. Config (endpoint, account-id, region, credentials) is supplied at construction time via a `make-connector` factory function, not passed to `run`. |
 | FR-CON-03 | Each entity map MUST include a `:heron/id` — a stable, globally unique string identifier for the resource. |
 | FR-CON-04 | The sync process MUST be idempotent: running the same connector twice without underlying changes MUST NOT produce new transactions. |
 | FR-CON-05 | Resources absent from a connector run that were present in the previous run MUST be retracted using `[:db/retractEntity eid]` (or targeted `:db/retract` datoms). |
@@ -141,8 +141,8 @@ Alex deploys and operates Heron itself. Alex configures connector credentials, m
 
 | ID | Requirement |
 |----|-------------|
-| FR-CHK-01 | A Check MUST be defined as an EDN map with at minimum: `:check/id`, `:check/name`, `:check/description`, `:check/query`. |
-| FR-CHK-02 | The `:check/query` MUST be a Datalog query that returns entity-ids of violating resources. Zero results means passing. |
+| FR-CHK-01 | A Check MUST be defined as a Clojure map with at minimum: `:heron/id`, `:heron.check/id`, `:heron.check/name`, `:heron.check/description`, `:heron.check/query`. |
+| FR-CHK-02 | The `:heron.check/query` MUST be a Datalog query that returns `[?id ?label]` tuples where `?id` is the `:heron/id` string of a violating resource and `?label` is its human-readable label. Zero results means passing. The query is stored in-code (not persisted to Datomic). |
 | FR-CHK-03 | Checks MUST be evaluated after every connector sync. |
 | FR-CHK-04 | Each evaluation MUST produce a Check Evaluation record stored in Datomic with: check-id, run timestamp, pass/fail, violating entity count, and a list of violating entity-ids. |
 | FR-CHK-05 | When a violating entity appears for the first time, Heron MUST record a `:transition/opened` event. |
@@ -285,17 +285,14 @@ Configuration via environment variables. Credentials (AWS, GitHub tokens) inject
 
 ```clojure
 (defprotocol IConnector
-  (connector-id [this]
-    "Returns a keyword identifying this connector, e.g. :aws/s3")
-
-  (fetch-entities [this config]
+  (run [this]
     "Fetches all entities from the provider. Returns a sequence of
-     entity maps, each containing :heron/id and provider attributes.")
-
-  (schema [this]
-    "Returns the Datomic schema (vector of attribute maps) for this
-     connector's entity types. Called once at startup to install schema."))
+     entity maps, each containing :heron/id and provider attributes."))
 ```
+
+All config (AWS endpoint, account-id, region, credentials) is captured at construction time. Each connector namespace exposes a `make-connector` factory function that closes over its config and returns a record implementing `IConnector`.
+
+Datomic schema is a standalone `def` in each connector namespace (e.g. `s3/schema`, `iam-roles/schema`) — it is not a protocol method. Schema installation is handled by the sync engine at startup.
 
 ### Entity Map Format
 
@@ -352,33 +349,29 @@ Queries naturally return only live (non-retracted) entities; no filter clause is
 ### Connector Run Metadata Schema
 
 ```clojure
-[{:db/ident       :connector-run/id
+[{:db/ident       :heron.connector-run/id
   :db/valueType   :db.type/string
   :db/cardinality :db.cardinality/one
   :db/unique      :db.unique/identity}
 
- {:db/ident       :connector-run/connector-id
-  :db/valueType   :db.type/keyword
+ {:db/ident       :heron.connector-run/provider
+  :db/valueType   :db.type/keyword   ;; :aws | :github
   :db/cardinality :db.cardinality/one}
 
- {:db/ident       :connector-run/started-at
+ {:db/ident       :heron.connector-run/connector
+  :db/valueType   :db.type/string    ;; e.g. "s3", "iam-roles", "iam-users"
+  :db/cardinality :db.cardinality/one}
+
+ {:db/ident       :heron.connector-run/started-at
   :db/valueType   :db.type/instant
   :db/cardinality :db.cardinality/one}
 
- {:db/ident       :connector-run/finished-at
+ {:db/ident       :heron.connector-run/finished-at
   :db/valueType   :db.type/instant
   :db/cardinality :db.cardinality/one}
 
- {:db/ident       :connector-run/status
-  :db/valueType   :db.type/keyword   ;; :success | :failure | :partial
-  :db/cardinality :db.cardinality/one}
-
- {:db/ident       :connector-run/entity-count
+ {:db/ident       :heron.connector-run/resource-count
   :db/valueType   :db.type/long
-  :db/cardinality :db.cardinality/one}
-
- {:db/ident       :connector-run/error-message
-  :db/valueType   :db.type/string
   :db/cardinality :db.cardinality/one}]
 ```
 
@@ -386,7 +379,7 @@ Queries naturally return only live (non-retracted) entities; no filter clause is
 
 | Service | Resource Types | Key Attributes |
 |---------|---------------|----------------|
-| S3 | Bucket | name, region, versioning, public-access-block config, encryption, lifecycle rules |
+| S3 | Bucket | name, versioning, public-access-block config, encryption, lifecycle rules (region schema defined but not yet populated — `GetBucketLocation` not yet called) |
 | EC2 | Instance | instance-id, type, state, AMI, VPC, subnet, security groups, tags |
 | EC2 | SecurityGroup | group-id, name, VPC, ingress rules, egress rules |
 | EC2 | VPC | vpc-id, CIDR, default? |
@@ -542,7 +535,7 @@ For Check and Report authors:
 
 1. **Queries naturally return live entities:** Because absent resources are natively retracted, no filter clause is needed. To query historical state, use `datomic.api/as-of`.
 2. **Use pull syntax for Reports:** `(pull ?e [:aws.s3.bucket/name :aws.s3.bucket/region])` returns maps instead of tuples, making results self-documenting.
-3. **Check queries must return entity-ids:** The first `?find` variable in a Check query must be the entity-id `?e` — this is how Heron tracks which specific resources are violating.
+3. **Check queries must return `[?id ?label]` tuples:** The find clause must bind `?id` (the `:heron/id` string) and `?label` (the `:heron/label` string) — this is how the `evaluate` function identifies and describes violating resources. Datomic internal entity-ids are opaque and not returned.
 4. **Use Datomic rules for reusable predicates:** Common filters (e.g., "is production-tagged") can be expressed as named Datalog rules and reused across queries.
 5. **Parameterize where possible:** Queries can accept arguments (`?account-id`, `?environment`) to make checks reusable across environments.
 
@@ -553,18 +546,29 @@ For Check and Report authors:
 ### Check Definition Schema
 
 ```clojure
-{;; Required
- :check/id          :s3/public-access-blocked       ;; namespaced keyword, unique
- :check/name        "S3 Buckets Block Public Access"
- :check/description "All S3 buckets must have the public access block fully enabled."
- :check/query       "[:find ?e :where
-                       [?e :aws.s3.bucket/public-access-blocked false]]"
+{;; Entity identity (used by CheckLoader to upsert into Datomic)
+ :heron/id               "heron:check:aws.s3/public-access-block-enabled"
+ :heron/label            "S3 Public Access Block Enabled"
 
- ;; Optional
- :check/severity    :high                           ;; post-MVP
- :check/enabled     true
- :check/tags        ["s3" "security" "cis-benchmark"]}
+ ;; Required check attributes (stored in Datomic)
+ :heron.check/id         "aws.s3/public-access-block-enabled"  ;; string, unique
+ :heron.check/name       "S3 Public Access Block Enabled"
+ :heron.check/description "All S3 buckets must have all four public access block settings enabled."
+
+ ;; Query — stored in-code only; dissoc'd before transacting to Datomic
+ :heron.check/query
+ '[:find ?id ?label
+   :where [?e :aws.s3.bucket/name _]
+          [?e :heron/id ?id]
+          [?e :heron/label ?label]
+          (not-join [?e]
+            [?e :aws.s3.bucket/block-public-acls true]
+            [?e :aws.s3.bucket/ignore-public-acls true]
+            [?e :aws.s3.bucket/block-public-policy true]
+            [?e :aws.s3.bucket/restrict-public-buckets true])]}
 ```
+
+The `:heron.check/query` is a Clojure quoted list (not an EDN string). The `CheckLoader` record implements `IConnector` and dissocs the query before transacting check metadata to Datomic — the query lives only in code.
 
 ### Check Evaluation Record Schema
 
@@ -593,11 +597,11 @@ For Check and Report authors:
 
 | ID | Name | Description |
 |----|------|-------------|
-| `:s3/public-access-blocked` | S3 Buckets Block Public Access | All S3 buckets must have the S3 Block Public Access setting fully enabled. |
-| `:iam/no-root-access-keys` | No IAM Root Access Keys | The AWS account root user must not have active access keys. |
-| `:ec2/no-public-ssh` | EC2 No Public SSH | No EC2 security group should permit inbound SSH (port 22) from 0.0.0.0/0. |
-| `:rds/no-public-rds` | RDS Not Publicly Accessible | No RDS instance should have `publicly-accessible` set to true. |
-| `:github/require-pr-reviews` | GitHub Repos Require PR Reviews | All non-archived GitHub repositories must have branch protection requiring at least one pull request review on the default branch. |
+| `"aws.s3/public-access-block-enabled"` | S3 Public Access Block Enabled | All S3 buckets must have all four public access block settings enabled. ✅ implemented |
+| `"aws.iam/no-root-access-keys"` | No IAM Root Access Keys | The AWS account root user must not have active access keys. |
+| `"aws.ec2/no-public-ssh"` | EC2 No Public SSH | No EC2 security group should permit inbound SSH (port 22) from 0.0.0.0/0. |
+| `"aws.rds/no-public-rds"` | RDS Not Publicly Accessible | No RDS instance should have `publicly-accessible` set to true. |
+| `"github/require-pr-reviews"` | GitHub Repos Require PR Reviews | All non-archived GitHub repositories must have branch protection requiring at least one pull request review on the default branch. |
 
 ### Report Definition Schema
 
@@ -743,12 +747,13 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 **Goal:** Prove the core data model works. Queryable data in Datomic.
 
 - [x] Datomic schema: `heron/id`, `heron/provider`, `heron/label`
-- [x] `IConnector` protocol defined
+- [x] `IConnector` protocol defined (`run [this]`, config-at-construction)
 - [x] AWS S3 connector (buckets only)
-- [x] AWS IAM connector (roles only)
+- [x] AWS IAM connector (roles + users — two separate connectors: `IAMRolesConnector`, `IAMUsersConnector`)
 - [x] Sync engine: upsert
 - [x] Sync engine: retract absent entities
 - [x] ConnectorRun metadata
+- [x] Check engine skeleton: `evaluate` fn, `CheckLoader`, `s3-public-access-block-enabled` check
 - [x] REPL-based Datalog queries working
 - [x] `docker-compose.yml` for Datomic transactor + PostgreSQL
 
@@ -758,7 +763,9 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 
 - [ ] Full AWS connector (EC2, RDS, Lambda, Route53, ACM)
 - [ ] Full GitHub connector (orgs, repos, teams, members)
-- [ ] Check engine + built-in checks
+- [x] Check engine (`evaluate`, `CheckLoader`)
+- [x] Built-in check: `aws.s3/public-access-block-enabled`
+- [ ] Built-in checks: remaining 4 (IAM root keys, EC2 SSH, RDS public, GitHub PR reviews)
 - [ ] Report engine + built-in reports
 - [ ] Ring/Reitit HTTP API
 - [ ] `POST /api/v1/query`
