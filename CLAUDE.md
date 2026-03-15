@@ -31,13 +31,20 @@ direnv allow         # Auto-activate shell on cd (requires direnv + nix-direnv)
 
 ## Build & Dev Commands
 
-*(To be added as implementation begins. Expected commands:)*
-
 ```bash
 clojure -T:build uberjar     # Build deployable JAR
 clojure -M:test              # Run tests
 docker compose up            # Start Datomic transactor + PostgreSQL
 ```
+
+## Workflow After Every Major Change
+
+After completing any significant implementation work:
+
+1. Run `/test` — runs the full Cucumber suite against the live dev stack
+2. Run `/commit` — stage, commit, and push if all tests pass
+
+Do not commit if tests are failing or pending.
 
 ## Architecture
 

@@ -761,7 +761,7 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 
 **Goal:** All MVP features working. Ready for internal use.
 
-- [ ] Full AWS connector (EC2, RDS, Lambda, Route53, ACM)
+- [x] Full AWS connector (EC2, RDS, Lambda, Route53, ACM)
 - [ ] Full GitHub connector (orgs, repos, teams, members)
 - [x] Check engine (`evaluate`, `CheckLoader`)
 - [x] Built-in check: `aws.s3/public-access-block-enabled`
