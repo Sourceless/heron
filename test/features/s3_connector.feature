@@ -14,3 +14,8 @@ Feature: S3 connector ingests buckets into Datomic
     And I run the S3 connector against LocalStack
     And I ingest the connector results into Datomic
     Then there is exactly 1 entity with heron id "aws:000000000000:s3:bucket:heron-test-data"
+
+  Scenario: Ingested bucket has provider and label set
+    When I run the S3 connector against LocalStack
+    And I ingest the connector results into Datomic
+    Then the bucket "heron-test-data" has provider :aws and label "heron-test-data"

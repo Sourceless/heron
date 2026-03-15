@@ -742,7 +742,7 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 
 **Goal:** Prove the core data model works. Queryable data in Datomic.
 
-- [ ] Datomic schema: `heron/id`, `heron/provider`, `heron/label`
+- [x] Datomic schema: `heron/id`, `heron/provider`, `heron/label`
 - [x] `IConnector` protocol defined
 - [x] AWS S3 connector (buckets only)
 - [ ] AWS IAM connector (roles only)

@@ -41,3 +41,13 @@
     (assert (= 1 (count results))
             (str "Expected 1 entity with :heron/id '" heron-id "', found: " (count results))))
   state)
+
+(Then "the bucket {string} has provider :aws and label {string}" [state bucket-name label]
+  (let [db  (d/db (:datomic-conn state))
+        eid (d/q '[:find ?e . :in $ ?n :where [?e :aws.s3.bucket/name ?n]] db bucket-name)]
+    (assert eid (str "Bucket '" bucket-name "' not found"))
+    (assert (= :aws  (d/q '[:find ?v . :in $ ?e :where [?e :heron/provider ?v]] db eid))
+            "Expected :heron/provider :aws")
+    (assert (= label (d/q '[:find ?v . :in $ ?e :where [?e :heron/label ?v]] db eid))
+            (str "Expected :heron/label '" label "'")))
+  state)

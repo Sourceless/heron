@@ -17,6 +17,8 @@
 
 (defn- bucket->entity [account-id {:keys [Name]}]
   {:heron/id           (str "aws:" account-id ":s3:bucket:" Name)
+   :heron/provider     :aws
+   :heron/label        Name
    :aws.s3.bucket/name Name})
 
 (defrecord S3Connector [client account-id]
