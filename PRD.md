@@ -743,13 +743,14 @@ No time estimates are provided. This is a solo project; phases are sequenced by 
 **Goal:** Prove the core data model works. Queryable data in Datomic.
 
 - [ ] Datomic schema: `heron/id`, `heron/provider`, `heron/label`
-- [ ] `IConnector` protocol defined
-- [ ] AWS S3 connector (buckets only)
+- [x] `IConnector` protocol defined
+- [x] AWS S3 connector (buckets only)
 - [ ] AWS IAM connector (roles only)
-- [ ] Sync engine: upsert + retract
+- [x] Sync engine: upsert
+- [ ] Sync engine: retract absent entities
 - [ ] ConnectorRun metadata
 - [ ] REPL-based Datalog queries working
-- [ ] `docker-compose.yml` for Datomic transactor + PostgreSQL
+- [x] `docker-compose.yml` for Datomic transactor + PostgreSQL
 
 ### Phase 1: MVP Core
 
